@@ -1,0 +1,55 @@
+name: Extract 3X-UI Source
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract source archive
+        run: |
+          set -e
+
+          if [ ! -f "3x-ui-source.zip" ]; then
+            echo "Source ZIP not found"
+            exit 1
+          fi
+
+          mkdir -p /tmp/3x-ui-source
+          unzip -q 3x-ui-source.zip -d /tmp/3x-ui-source
+
+          SRC=/tmp/3x-ui-source
+          COUNT=$(find "$SRC" -mindepth 1 -maxdepth 1 | wc -l)
+
+          if [ "$COUNT" -eq 1 ] && \
+             [ -d "$(find "$SRC" -mindepth 1 -maxdepth 1 -type d)" ]; then
+            SRC=$(find "$SRC" -mindepth 1 -maxdepth 1 -type d)
+          fi
+
+          rsync -a \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='Dockerfile' \
+            --exclude='README.md' \
+            "$SRC"/ ./
+
+      - name: Commit extracted source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Extract 3X-UI source files"
+            git push
+          else
+            echo "No changes to commit"
+          fi
